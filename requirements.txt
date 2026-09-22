@@ -1,0 +1,27 @@
+# Hugging Face / LoRA stack
+transformers==4.40.2
+peft==0.10.0
+accelerate==0.29.3
+datasets==2.18.0
+trl==0.8.6
+deepspeed==0.14.4
+
+# Scientific stack
+numpy==1.26.4
+scipy==1.13.1
+scikit-learn==1.5.0
+pandas==2.2.2
+tqdm==4.66.4
+
+# Model / tokenizer utilities
+sentencepiece==0.2.0
+protobuf==4.25.3
+safetensors==0.4.3
+huggingface_hub==0.23.4
+
+# Evaluation
+evaluate==0.4.2
+fuzzywuzzy==0.18.0
+python-Levenshtein==0.25.1
+nltk==3.8.1
+rouge==1.0.1
