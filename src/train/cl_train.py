@@ -1,5 +1,4 @@
 import argparse
-import pathlib
 import json
 import os
 
@@ -88,7 +87,13 @@ def train_continual_learning():
     # Model & Tokenizer
     ################
     config = AutoConfig.from_pretrained(model_config.model_name_or_path)
-    model = AutoModelForCausalLM.from_pretrained(model_config.model_name_or_path, config=config)
+    torch_dtype = torch.bfloat16 if training_args.bf16 else torch.float16 if training_args.fp16 else None
+    model = AutoModelForCausalLM.from_pretrained(
+        model_config.model_name_or_path,
+        config=config,
+        torch_dtype=torch_dtype,
+        low_cpu_mem_usage=True,
+    )
     model.config.use_cache = False
 
     if training_args.gradient_checkpointing:

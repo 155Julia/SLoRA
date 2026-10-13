@@ -23,7 +23,7 @@ echo "[INFO] Task path=${TASK_PATH}"
 echo "[INFO] Model base=${MODEL_BASE}"
 echo "[INFO] Model path=${MODEL_PATH}"
 echo "[INFO] Dataset=${DATASET}"
-echo "[INFO] CONV_MODE=${CONV_MODE}, DENOISED_MODE=${DROP_MODE}, TEST_ORDER=${TEST_ORDER}"
+echo "[INFO] CONV_MODE=${CONV_MODE}, DENOISED_MODE=${DENOISED_MODE}, TEST_ORDER=${TEST_ORDER}"
 echo "[INFO] Logs -> ${OUT_DIR}"
 
 echo "[RUN] Inference ${DATASET}"
@@ -45,4 +45,3 @@ python -u -m src.eval.eval_trace \
     --input_file "${OUT_DIR}/infer.jsonl" \
     --output_file "${OUT_DIR}/wrong.jsonl" \
     >> "${OUT_DIR}/eval.log" 2>&1
-    
