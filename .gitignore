@@ -1,0 +1,12 @@
+LLMs/
+data/
+checkpoints/
+logs/
+
+__pycache__/
+*.py[cod]
+
+.DS_Store
+wandb/
+runs/
+outputs/

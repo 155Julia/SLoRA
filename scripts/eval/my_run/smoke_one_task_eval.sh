@@ -11,6 +11,7 @@ MODEL=llama3
 CONV_MODE=llama3
 CKPT=smoke-${MODEL}-lora-r8a16
 MAX_NEW_TOKENS=128
+PYTHON_BIN=/share/home/jiayu/miniconda3/envs/slora/bin/python
 
 export CUDA_VISIBLE_DEVICES=0
 export PYTHONPATH="$PWD:$PYTHONPATH"
@@ -29,7 +30,7 @@ echo "[INFO] MODEL_DIR=${MODEL_DIR}"
 echo "[INFO] QUESTION_FILE=${QUESTION_FILE}"
 echo "[INFO] ANSWERS_FILE=${ANSWERS_FILE}"
 
-python -u -m src.eval.model_diverse_gen_batch \
+"${PYTHON_BIN}" -u -m src.eval.model_diverse_gen_batch \
     --model-path "${MODEL_DIR}" \
     --model-base "${MODEL_BASE}" \
     --question-file "${QUESTION_FILE}" \
@@ -42,6 +43,6 @@ python -u -m src.eval.model_diverse_gen_batch \
     --max_new_tokens "${MAX_NEW_TOKENS}" \
     --resume
 
-python -u -m src.eval.eval_trace \
+"${PYTHON_BIN}" -u -m src.eval.eval_trace \
     --input_file "${ANSWERS_FILE}" \
     --output_file "${WRONG_FILE}"

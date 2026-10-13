@@ -8,6 +8,7 @@ LOGS_BASE_PATH=logs
 MODEL_BASE=LLMs/Meta-Llama-3-8B-Instruct
 MODEL=llama3
 DATASET=C-STANCE
+PYTHON_BIN=/share/home/jiayu/miniconda3/envs/slora/bin/python
 
 export CUDA_VISIBLE_DEVICES=0
 GPUS_PER_NODE=1
@@ -52,7 +53,7 @@ echo "[INFO] OUTPUT_DIR=${OUTPUT_DIR}"
 echo "[INFO] LOG_FILE=${LOG_FILE}"
 echo "[INFO] GPUS_PER_NODE=${GPUS_PER_NODE}, MAX_STEPS=${MAX_STEPS}, PRECISION=${PRECISION}"
 
-python -u -m torch.distributed.run \
+"${PYTHON_BIN}" -u -m torch.distributed.run \
     --nproc_per_node "${GPUS_PER_NODE}" \
     --nnodes 1 \
     --rdzv_endpoint "${MASTER_ADDR}:${MASTER_PORT}" \
@@ -73,7 +74,7 @@ python -u -m torch.distributed.run \
     --per_device_train_batch_size "${PER_DEVICE_TRAIN_BATCH_SIZE}" \
     --per_device_eval_batch_size 1 \
     --gradient_accumulation_steps "${GRADIENT_ACCUMULATION_STEPS}" \
-    --eval_strategy "no" \
+    --evaluation_strategy "no" \
     --save_strategy "steps" \
     --save_steps "${MAX_STEPS}" \
     --save_total_limit 1 \

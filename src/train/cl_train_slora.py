@@ -6,14 +6,12 @@ from tqdm import tqdm
 import torch
 from safetensors.torch import save_file, load_file
 
-from transformers import AutoTokenizer, AutoConfig, AutoModelForCausalLM, Trainer
+from transformers import AutoTokenizer, AutoConfig, AutoModelForCausalLM, Trainer, TrainingArguments
 from peft import LoraConfig, get_peft_model
 from dataclasses import dataclass, field
 from datasets import Dataset
 from trl import (
     ModelConfig,
-    ScriptArguments,
-    SFTConfig,
     SFTTrainer,
     TrlParser,
     get_peft_config
@@ -28,7 +26,7 @@ def rank0_print(*args):
         print(*args)
 
 @dataclass
-class ScriptArguments(ScriptArguments):
+class ScriptArguments:
     dataset_name: str = field(metadata={"help": "Dataset name."}, default=None)
     train_data_path: str = field(metadata={"help": "Path to the training data."}, default=None)
     val_data_path: str = field(metadata={"help": "Path to the validation data."}, default=None)
@@ -248,7 +246,7 @@ def train_continual_learning():
         args=training_args,
         train_dataset=train_data,
         eval_dataset=eval_data,
-        processing_class=tokenizer,
+        tokenizer=tokenizer,
         peft_config=get_peft_config(model_config),
     )
 
@@ -269,7 +267,7 @@ def train_continual_learning():
         save_file(denoised_state_dict, os.path.join(training_args.output_dir, f"{script_args.mode}.safetensors"))
 
 def make_parser(subparsers: argparse._SubParsersAction = None):
-    dataclass_types = (ScriptArguments, SFTConfig, ModelArguments)
+    dataclass_types = (ScriptArguments, TrainingArguments, ModelArguments)
     if subparsers is not None:
         parser = subparsers.add_parser("sft", help="Run the SFT training script", dataclass_types=dataclass_types)
     else:
@@ -278,4 +276,3 @@ def make_parser(subparsers: argparse._SubParsersAction = None):
 
 if __name__ == "__main__":
     train_continual_learning()
-

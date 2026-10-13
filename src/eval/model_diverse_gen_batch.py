@@ -210,6 +210,8 @@ if __name__ == "__main__":
     parser.add_argument("--top_p", type=float, default=1.0)
     parser.add_argument("--num_beams", type=int, default=1)
     parser.add_argument("--batch_size", type=int, default=1)
+    parser.add_argument("--num_chunks", type=int, default=1)
+    parser.add_argument("--chunk_idx", type=int, default=0)
     parser.add_argument("--use_logit_bias", action="store_true", default=False)
     parser.add_argument("--save_path", type=str, default=None)
     parser.add_argument("--denoised_mode", type=str, default="max")
