@@ -1,7 +1,7 @@
 #!/bin/bash
 set -e
 
-TASK_PATH=data
+TASK_PATH=data/TRACE-Benchmark/LLM-CL-Benchmark_500
 MODEL_PATH=checkpoints
 LOGS_BASE_PATH=logs
 

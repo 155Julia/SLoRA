@@ -2,7 +2,7 @@
 set -e
 
 # Your config
-TASK_PATH=data
+TASK_PATH=data/TRACE-Benchmark/LLM-CL-Benchmark_500
 MODEL_PATH=checkpoints
 LOGS_BASE_PATH=logs
 MODEL_BASE=LLMs/Meta-Llama-3-8B-Instruct

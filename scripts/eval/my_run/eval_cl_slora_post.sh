@@ -1,7 +1,7 @@
 #!/bin/bash
 set -e
 
-TASK_PATH=/sfs/rhome/yanglina/project/SLORA/data
+TASK_PATH=data/TRACE-Benchmark/LLM-CL-Benchmark_500
 MODEL_PATH=/sfs/rhome/yanglina/project/SLORA/checkpoints
 LOGS_BASE_PATH=/sfs/rhome/yanglina/project/SLORA/logs
 
