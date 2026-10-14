@@ -13,6 +13,7 @@ scipy==1.13.1
 scikit-learn==1.5.0
 pandas==2.2.2
 tqdm==4.66.4
+matplotlib==3.8.4
 
 # Model / tokenizer utilities
 sentencepiece==0.2.0
