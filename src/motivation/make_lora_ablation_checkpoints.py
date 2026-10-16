@@ -1,37 +1,13 @@
 import argparse
 import hashlib
 import json
-import os
-import shutil
 from pathlib import Path
 
 import torch
 from safetensors.torch import load_file, save_file
+from src.motivation.common import MODES, parse_ratios, ratio_label, unique_runs
 
-
-MODEL_WEIGHT_FILES = {"adapter_model.safetensors", "adapter_model.bin"}
-MODES = ("seq_lora", "drop_first", "drop_second", "drop_all")
-SELECTIONS = ("energy_low", "energy_high", "random")
-
-
-def parse_ratios(value):
-    ratios = []
-    for item in value.split(","):
-        item = item.strip()
-        if not item:
-            continue
-        ratio = float(item)
-        if ratio < 0 or ratio > 1:
-            raise ValueError(f"Drop ratio must be in [0, 1], got {ratio}")
-        ratios.append(ratio)
-    if not ratios:
-        raise ValueError("At least one drop ratio is required.")
-    return ratios
-
-
-def ratio_label(ratio):
-    text = f"{ratio:.4f}".rstrip("0").rstrip(".")
-    return text if text else "0"
+SELECTIONS = ("svd_low", "energy_low", "energy_high", "random")
 
 
 def stable_seed(seed, name):
@@ -39,35 +15,14 @@ def stable_seed(seed, name):
     return int.from_bytes(digest[:8], "big") % (2**31)
 
 
-def copy_adapter_dir(source_dir, target_dir):
-    source_dir = Path(source_dir)
-    target_dir = Path(target_dir)
-    if target_dir.exists():
-        shutil.rmtree(target_dir)
-    target_dir.mkdir(parents=True)
-
-    for item in source_dir.iterdir():
-        if item.name in MODEL_WEIGHT_FILES:
-            continue
-        if item.is_dir() and item.name.startswith("checkpoint-"):
-            continue
-        dest = target_dir / item.name
-        if item.is_dir():
-            shutil.copytree(item, dest)
-        else:
-            shutil.copy2(item, dest)
-
-
 def component_scores(lora_a, lora_b):
     a = lora_a.float().reshape(lora_a.shape[0], -1)
-    b = lora_b.float().reshape(lora_b.shape[1], -1)
+    b = lora_b.float().T  # Each row is B[:, i], not a reshaped memory chunk.
     return torch.linalg.vector_norm(a, dim=1) * torch.linalg.vector_norm(b, dim=1)
 
 
 def choose_drop_indices(name, rank, ratio, lora_a, lora_b, selection, seed):
-    drop_count = int(rank * ratio)
-    if ratio > 0 and drop_count == 0:
-        drop_count = 1
+    drop_count = int(rank * ratio + 1e-9)
     drop_count = min(drop_count, rank)
     if drop_count == 0:
         return torch.empty(0, dtype=torch.long)
@@ -80,6 +35,21 @@ def choose_drop_indices(name, rank, ratio, lora_a, lora_b, selection, seed):
     scores = component_scores(lora_a.cpu(), lora_b.cpu())
     descending = selection == "energy_high"
     return torch.argsort(scores, descending=descending)[:drop_count]
+
+
+def truncate_svd(lora_a, lora_b, drop_count):
+    """Exact SVD of BA via a rank-sized core; keep shapes and PEFT scaling."""
+    rank = lora_a.shape[0]
+    # BA = Qb (Rb Ra.T) Qa.T. No dense model-sized update is materialized.
+    qb, rb = torch.linalg.qr(lora_b.float(), mode="reduced")
+    qa, ra = torch.linalg.qr(lora_a.float().T, mode="reduced")
+    u, sigma, vh = torch.linalg.svd(rb @ ra.T, full_matrices=False)
+    keep = min(rank - drop_count, len(sigma))
+    a = torch.zeros_like(lora_a)
+    b = torch.zeros_like(lora_b)
+    a[:keep] = (vh[:keep] @ qa.T).to(a.dtype)
+    b[:, :keep] = ((qb @ u[:, :keep]) * sigma[:keep]).to(b.dtype)
+    return a, b
 
 
 def drop_rank_components(state_dict, ratio, selection, seed):
@@ -100,6 +70,13 @@ def drop_rank_components(state_dict, ratio, selection, seed):
         rank = lora_a.shape[0]
         if lora_b.shape[1] != rank:
             raise ValueError(f"Rank mismatch for {key}: A rank={rank}, B rank={lora_b.shape[1]}")
+
+        if selection == "svd_low":
+            drop_count = int(rank * ratio + 1e-9)
+            if drop_count:
+                ablated[key], ablated[lora_b_key] = truncate_svd(lora_a, lora_b, drop_count)
+            dropped[key] = list(range(rank - drop_count, rank))
+            continue
 
         indices = choose_drop_indices(key, rank, ratio, lora_a, lora_b, selection, seed)
         if indices.numel() == 0:
@@ -141,66 +118,61 @@ def resolve_order_dirs(checkpoint_root):
 
 def build_ablation(source_checkpoint, output_root, ratios, modes, selection, seed):
     order_dirs = resolve_order_dirs(source_checkpoint)
-    output_root = Path(output_root)
+    if [order for order, _ in order_dirs] != [1, 2]:
+        raise ValueError("The motivation experiment requires exactly order1 and order2")
+    runs = list(unique_runs(modes, ratios))
+    output_root = Path(output_root).resolve()
+    # Never silently replace old experiments (or reuse their inference results).
+    if output_root.exists():
+        raise FileExistsError(f"Choose a fresh output root: {output_root}")
+    for _, source in order_dirs:
+        for filename in ("adapter_model.safetensors", "adapter_config.json"):
+            if not (source / filename).is_file():
+                raise FileNotFoundError(source / filename)
+    output_root.mkdir(parents=True)
     manifest = {
         "source_checkpoint": str(Path(source_checkpoint).resolve()),
-        "selection": selection,
-        "seed": seed,
-        "ratios": ratios,
-        "modes": modes,
-        "orders": [order_id for order_id, _ in order_dirs],
+        "selection": selection, "seed": seed, "ratios": ratios, "modes": modes,
+        "rounding": "floor(rank * ratio); actual drop count recorded per tensor",
         "runs": [],
     }
-
-    for mode in modes:
-        for ratio in ratios:
-            run_root = output_root / mode / f"r{ratio_label(ratio)}"
-            for order_id, source_dir in order_dirs:
-                target_dir = run_root / f"order{order_id}"
-                copy_adapter_dir(source_dir, target_dir)
-
-                source_weight = source_dir / "adapter_model.safetensors"
-                if not source_weight.exists():
-                    raise FileNotFoundError(f"Missing adapter weights: {source_weight}")
-
-                state_dict = load_file(str(source_weight))
-                if should_drop(mode, order_id):
-                    new_state_dict, dropped = drop_rank_components(state_dict, ratio, selection, seed)
-                else:
-                    new_state_dict = {key: value.clone().contiguous() for key, value in state_dict.items()}
-                    dropped = {}
-                save_file(new_state_dict, str(target_dir / "adapter_model.safetensors"))
-
-                with open(target_dir / "ablation_meta.json", "w", encoding="utf-8") as f:
-                    json.dump(
-                        {
-                            "mode": mode,
-                            "ratio": ratio,
-                            "order": order_id,
-                            "source_dir": str(source_dir),
-                            "selection": selection,
-                            "seed": seed,
-                            "dropped_rank_indices": dropped,
-                        },
-                        f,
-                        ensure_ascii=False,
-                        indent=2,
-                    )
-
-            manifest["runs"].append({"mode": mode, "ratio": ratio, "path": str(run_root)})
-
-    output_root.mkdir(parents=True, exist_ok=True)
-    with open(output_root / "manifest.json", "w", encoding="utf-8") as f:
-        json.dump(manifest, f, ensure_ascii=False, indent=2)
+    modified_adapters = {}
+    for mode, ratio in runs:
+        run_root = output_root / mode / f"r{ratio_label(ratio)}"
+        run_root.mkdir(parents=True)
+        for order_id, source in order_dirs:
+            source = source.resolve()
+            target = run_root / f"order{order_id}"
+            if not should_drop(mode, order_id):
+                target.symlink_to(source, target_is_directory=True)
+                continue
+            cache_key = (order_id, ratio)
+            if cache_key in modified_adapters:
+                target.symlink_to(modified_adapters[cache_key], target_is_directory=True)
+                continue
+            target.mkdir()
+            # Only model weights/config are needed; tokenizer is loaded from the base.
+            (target / "adapter_config.json").write_bytes((source / "adapter_config.json").read_bytes())
+            state = load_file(str(source / "adapter_model.safetensors"))
+            ablated, dropped = drop_rank_components(state, ratio, selection, seed)
+            save_file(ablated, str(target / "adapter_model.safetensors"))
+            metadata = {"ratio": ratio, "order": order_id,
+                        "selection": selection, "seed": seed,
+                        "index_basis": "descending singular values" if selection == "svd_low" else "original A/B components",
+                        "dropped_rank_indices": dropped}
+            (target / "ablation_meta.json").write_text(json.dumps(metadata, indent=2) + "\n")
+            modified_adapters[cache_key] = target
+        manifest["runs"].append({"mode": mode, "ratio": ratio, "path": str(run_root)})
+    (output_root / "manifest.json").write_text(json.dumps(manifest, indent=2) + "\n")
 
 
 def main():
     parser = argparse.ArgumentParser(description="Create rank-component LoRA ablation checkpoints.")
     parser.add_argument("--source-checkpoint", required=True, help="Checkpoint root containing order1/order2/... dirs.")
     parser.add_argument("--output-root", required=True, help="Where ablated checkpoint trees will be written.")
-    parser.add_argument("--ratios", default="0,0.1,0.2,0.3,0.4,0.5", help="Comma-separated drop ratios.")
+    parser.add_argument("--ratios", default="0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9", help="Comma-separated drop ratios.")
     parser.add_argument("--modes", default="seq_lora,drop_first,drop_second,drop_all", help="Comma-separated modes.")
-    parser.add_argument("--selection", choices=SELECTIONS, default="energy_low")
+    parser.add_argument("--selection", choices=SELECTIONS, default="svd_low")
     parser.add_argument("--seed", type=int, default=2026)
     args = parser.parse_args()
 

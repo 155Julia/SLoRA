@@ -1,5 +1,5 @@
 LLMs/
-data/
+/data/
 checkpoints/
 logs/
 

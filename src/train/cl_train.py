@@ -27,6 +27,7 @@ class ScriptArguments:
     train_data_path: str = field(metadata={"help": "Path to the training data."}, default=None)
     val_data_path: str = field(metadata={"help": "Path to the validation data."}, default=None)
     task_id: int = field(default=0)
+    max_seq_length: int = field(default=1024, metadata={"help": "Maximum tokenized training sequence length."})
 
 @dataclass
 class ModelArguments(ModelConfig):
@@ -141,6 +142,7 @@ def train_continual_learning():
         eval_dataset=eval_data,
         tokenizer=tokenizer,
         peft_config=get_peft_config(model_config),
+        max_seq_length=script_args.max_seq_length,
     )
 
     trainer.train()

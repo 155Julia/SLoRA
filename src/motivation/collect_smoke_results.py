@@ -14,18 +14,7 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
 
-def parse_ratios(value):
-    ratios = []
-    for item in value.split(","):
-        item = item.strip()
-        if item:
-            ratios.append(float(item))
-    return ratios
-
-
-def ratio_label(ratio):
-    text = f"{ratio:.4f}".rstrip("0").rstrip(".")
-    return text if text else "0"
+from src.motivation.common import parse_ratios, ratio_label
 
 
 def parse_eval_log(path, dataset):
@@ -35,10 +24,10 @@ def parse_eval_log(path, dataset):
     result = None
     with open(path, "r", encoding="utf-8") as f:
         for line in f:
-            if marker not in line:
-                continue
-            payload = line.split(marker, 1)[1].strip()
-            result = ast.literal_eval(payload)
+            if marker in line:
+                result = ast.literal_eval(line.split(marker, 1)[1].strip())
+            elif f"Acc in {dataset}:" in line:
+                result = {"accuracy": float(line.split(f"Acc in {dataset}:", 1)[1])}
     return result
 
 
@@ -46,7 +35,8 @@ def collect_results(log_root, dataset, modes, ratios):
     rows = []
     for mode in modes:
         for ratio in ratios:
-            eval_log = Path(log_root) / mode / f"r{ratio_label(ratio)}" / dataset / "eval.log"
+            source_mode, source_ratio = ("seq_lora", 0) if mode == "seq_lora" or ratio == 0 else (mode, ratio)
+            eval_log = Path(log_root) / source_mode / f"r{ratio_label(source_ratio)}" / dataset / "eval.log"
             result = parse_eval_log(eval_log, dataset)
             row = {
                 "mode": mode,
@@ -147,8 +137,9 @@ def write_plot(rows, output_dir, metric):
 def main():
     parser = argparse.ArgumentParser(description="Collect motivation smoke eval logs into CSV/JSON/SVG.")
     parser.add_argument("--log-root", required=True, help="Root containing mode/rX/DATASET/eval.log folders.")
-    parser.add_argument("--dataset", default="C-STANCE")
-    parser.add_argument("--ratios", default="0,0.1,0.2,0.3,0.4,0.5")
+    parser.add_argument("--manifest", help="Read the actual modes/ratios from an ablation manifest.")
+    parser.add_argument("--dataset", default="amazon")
+    parser.add_argument("--ratios", default="0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9")
     parser.add_argument("--modes", default="seq_lora,drop_first,drop_second,drop_all")
     parser.add_argument("--metric", default="accuracy")
     parser.add_argument("--output-dir", required=True)
@@ -156,10 +147,17 @@ def main():
 
     ratios = parse_ratios(args.ratios)
     modes = [mode.strip() for mode in args.modes.split(",") if mode.strip()]
+    if args.manifest:
+        manifest = json.loads(Path(args.manifest).read_text())
+        ratios, modes = manifest["ratios"], manifest["modes"]
+        modes = list(dict.fromkeys(["seq_lora"] + modes))
     output_dir = Path(args.output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
 
     rows = collect_results(args.log_root, args.dataset, modes, ratios)
+    missing = [row["eval_log"] for row in rows if row["status"] != "ok"]
+    if missing:
+        raise ValueError(f"Missing evaluation results: {missing}")
     write_csv(rows, output_dir / "results.csv")
     write_json(rows, output_dir / "results.json")
     wrote_plot = write_plot(rows, output_dir, args.metric)
