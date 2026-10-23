@@ -37,3 +37,5 @@ ABLATION_ROOT=${ABLATION_ROOT:-${SOURCE_CHECKPOINT}-ablation-${SELECTION}}
 LOG_ROOT=${LOG_ROOT:-logs/$CKPT/$SELECTION}
 OUTPUT_DIR=${OUTPUT_DIR:-$LOG_ROOT/summary}
 DRY_RUN=${DRY_RUN:-0}
+# Set to 1 only to restart incomplete inference while preserving it under partial-<timestamp>.
+RESUME_EVAL=${RESUME_EVAL:-0}

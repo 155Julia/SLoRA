@@ -112,7 +112,10 @@ uses the generated manifest, and collection reads that manifest's ratios/modes.
 Existing training/output roots or predictions cause an error instead of silently
 reusing another configuration. For a new experiment choose a new `CKPT`; for
 another selection use `SELECTION`. Failed runs need a fresh output path (there
-is no automatic resume). Training uses `pipefail` so failures cannot be hidden
+is no automatic training resume). Evaluation skips completed scores. To restart
+an incomplete inference, run `RESUME_EVAL=1 bash scripts/motivation/run.sh eval`;
+the incomplete files are retained in a timestamped `partial-*` directory before
+the setting is re-run. Training uses `pipefail` so failures cannot be hidden
 by `tee`. Missing evaluation results fail collection rather than produce a
 misleading partial plot.
 

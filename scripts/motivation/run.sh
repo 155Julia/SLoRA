@@ -62,8 +62,24 @@ evaluate() {
     while IFS=$'\t' read -r mode ratio checkpoint; do
         out="$LOG_ROOT/$mode/r$ratio/$TASK1"
         if [[ "$DRY_RUN" != 1 ]]; then
-            [[ ! -e "$out/infer.jsonl" ]] || { echo "Existing predictions: $out; choose a fresh LOG_ROOT." >&2; exit 1; }
             mkdir -p "$out"
+            # An evaluation log is written only after inference completed successfully.
+            if [[ -f "$out/eval.log" ]] && grep -q "^Acc in $TASK1:" "$out/eval.log"; then
+                echo "[SKIP] Completed evaluation: $out"
+                continue
+            fi
+            if [[ -e "$out/infer.jsonl" ]]; then
+                if [[ "$RESUME_EVAL" != 1 ]]; then
+                    echo "Incomplete predictions found: $out. Re-run with RESUME_EVAL=1 to preserve and restart them." >&2
+                    exit 1
+                fi
+                partial_dir="$out/partial-$(date +%Y%m%d-%H%M%S)"
+                mkdir "$partial_dir"
+                for file in infer.jsonl infer.log wrong.json eval.log eval_config.txt; do
+                    [[ -e "$out/$file" ]] && mv "$out/$file" "$partial_dir/"
+                done
+                echo "[RESTART] Preserved incomplete predictions in $partial_dir"
+            fi
             declare -p TASK_PATH TASK1 MODEL_BASE CONV_MODE EVAL_MODULE EVAL_BATCH_SIZE MAX_NEW_TOKENS > "$out/eval_config.txt"
         fi
         cmd=("$PYTHON_BIN" -u -m src.eval.model_diverse_gen_batch
