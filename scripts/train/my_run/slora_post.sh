@@ -1,18 +1,17 @@
 #!/bin/bash
-set -e
-TASK_PATH=data/TRACE-Benchmark/LLM-CL-Benchmark_500
+set -eo pipefail
+TASK_PATH=${TASK_PATH:-data/TRACE-Benchmark/LLM-CL-Benchmark_5000}
 MODEL_PATH=checkpoints
 LOGS_BASE_PATH=logs
 
 # Your config
-MODEL_BASE=LLMs/Meta-Llama-3-8B-Instruct
+MODEL_BASE=${MODEL_BASE:-LLMs/Meta-Llama-3.1-8B-Instruct}
 MODEL=llama3
 TRAINING_DATA=("C-STANCE" "FOMC" "MeetingBank" "Py150" "ScienceQA" "NumGLUE-cm" "NumGLUE-ds" "20Minuten")
 
-CKPT=${MODEL}-8b-lora-r64a128
+CKPT=${CKPT:-${MODEL}-8b-lora-r64a128}
 
 
-CKPT=${ORDER}-${CKPT}
 LOG_DIR=${LOGS_BASE_PATH}/${CKPT}
 OUTPUT_DIR=${MODEL_PATH}/${CKPT}
 
@@ -36,9 +35,7 @@ for idx in "${!TRAINING_DATA[@]}"; do
 
     echo "Starting training for ${TASK_NAME} (order ${ORDER})..."
 
-    bash ./scripts/train/my_slurm/slora_post.sh $MODEL_BASE $MODEL "$TASK_NAME" "$TASK_FILE" $TEMP_OUTPUT_DIR $ORDER $TRAIN_EPOCH &> $LOG_FILE 
-
-    if [ $? -ne 0 ]; then
+    if ! bash ./scripts/train/my_slurm/slora_post.sh "$MODEL_BASE" "$MODEL" "$TASK_NAME" "$TASK_FILE" "$TEMP_OUTPUT_DIR" "$ORDER" "$TRAIN_EPOCH" 2>&1 | tee "$LOG_FILE"; then
         echo "ERROR: Training for ${TASK_NAME} failed (order ${ORDER}). Aborting sequence."
         exit 1
     fi

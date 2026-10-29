@@ -190,7 +190,7 @@ def train_continual_learning():
     # Model & Tokenizer
     ################
     config = AutoConfig.from_pretrained(model_config.model_name_or_path)
-    base_model = AutoModelForCausalLM.from_pretrained(model_config.model_name_or_path, config=config)
+    base_model = AutoModelForCausalLM.from_pretrained(model_config.model_name_or_path, config=config, torch_dtype=torch.float16 if training_args.fp16 else None, low_cpu_mem_usage=True)
 
     model = base_model
     model.config.use_cache = False

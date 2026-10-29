@@ -1,12 +1,13 @@
 #!/bin/bash
 set -e
 
-GPUS_PER_NODE=1
+GPUS_PER_NODE=${GPUS_PER_NODE:-2}
 NNODES=1  
 MASTER_PORT=$((RANDOM % 101 + 20000)) 
 MASTER_ADDR="127.0.0.1" 
 export LOGLEVEL=INFO
-export CUDA_VISIBLE_DEVICES="4" 
+export CUDA_VISIBLE_DEVICES=${CUDA_VISIBLE_DEVICES:-0,1}
+PYTHON_BIN=${PYTHON_BIN:-python}
 
 MODEL_PATH="$1" 
 MODEL="$2"
@@ -21,17 +22,17 @@ ALPHA="${10}"
 echo "R=${R}, ALPHA=${ALPHA}"
 
 echo "output dir is ${OUTPUT_DIR}, ${MODEL_PATH}, ${DATASET}, ${DATA_PATH}, ORDER=${ORDER}"
-export PYTHONPATH="$PWD:$PYTHONPATH"
+export PYTHONPATH="$PWD${PYTHONPATH:+:$PYTHONPATH}"
 echo "Set PYTHONPATH to: $PYTHONPATH"
 
-python -u -m torch.distributed.run \
+"$PYTHON_BIN" -u -m torch.distributed.run \
     --nproc_per_node $GPUS_PER_NODE \
     --nnodes $NNODES \
     --rdzv_endpoint $MASTER_ADDR:$MASTER_PORT  \
     --rdzv_backend c10d \
     --node_rank 0 \
     src/train/cl_train_slora.py \
-    --bf16 True \
+    --bf16 False --fp16 True \
     --use_peft True \
     --lora_r $R --lora_alpha $ALPHA \
     --deepspeed scripts/zero2.json \
@@ -41,9 +42,9 @@ python -u -m torch.distributed.run \
     --train_data_path $DATA_PATH \
     --output_dir $OUTPUT_DIR \
     --num_train_epochs $TRAIN_EPOCH \
-    --per_device_train_batch_size 2 \
+    --per_device_train_batch_size 1 \
     --per_device_eval_batch_size 4 \
-    --gradient_accumulation_steps 8 \
+    --gradient_accumulation_steps 16 \
     --evaluation_strategy "no" \
     --save_strategy "steps" \
     --save_steps 100 \

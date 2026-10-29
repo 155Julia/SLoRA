@@ -10,6 +10,7 @@ DATASET="$6"
 CONV_MODE="$7"
 DENOISED_MODE="$8"
 TEST_ORDER="$9"
+PYTHON_BIN=${PYTHON_BIN:-python}
 
 DATA_PATH="${TASK_PATH}/${DATASET}"
 MODEL_PATH="${MODEL_PATH}/${CKPT}"
@@ -27,7 +28,7 @@ echo "[INFO] CONV_MODE=${CONV_MODE}, DENOISED_MODE=${DENOISED_MODE}, TEST_ORDER=
 echo "[INFO] Logs -> ${OUT_DIR}"
 
 echo "[RUN] Inference ${DATASET}"
-python -u -m src.eval.model_diverse_gen_batch \
+"$PYTHON_BIN" -u -m src.eval.model_diverse_gen_batch \
     --model-path "${MODEL_PATH}" \
     --model-base "${MODEL_BASE}" \
     --question-file "${DATA_PATH}/test.json" \
@@ -41,7 +42,7 @@ python -u -m src.eval.model_diverse_gen_batch \
     >> "${OUT_DIR}/infer.log" 2>&1
 
 echo "[RUN] Evaluate ${DATASET}"
-python -u -m src.eval.eval_trace \
+"$PYTHON_BIN" -u -m src.eval.eval_trace \
     --input_file "${OUT_DIR}/infer.jsonl" \
     --output_file "${OUT_DIR}/wrong.jsonl" \
     >> "${OUT_DIR}/eval.log" 2>&1

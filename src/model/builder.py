@@ -153,7 +153,7 @@ def denoising(base_model, delta_weights, mode='max'):
 
             base_W_tensor = base_weights[base_weight_name].detach()
             base_U, _, _ = torch.linalg.svd(base_W_tensor.to(torch.float32), full_matrices=False)
-            base_U_r = base_U[:, :rank]
+            base_U_r = base_U[:, :rank].to(lora_A.device)
 
         delta_W_tensor = torch.mm(lora_B, lora_A)
         delta_W_tensor_32 = delta_W_tensor.to(torch.float32)
@@ -293,4 +293,4 @@ def load_continual_pretrained_model(model_path, model_base, model_name, denoised
     if tokenizer.pad_token_id is None:
         tokenizer.pad_token_id = tokenizer.eos_token_id 
         
-    return tokenizer, model, context_len, tokenizer  
+    return tokenizer, model, context_len, tokenizer

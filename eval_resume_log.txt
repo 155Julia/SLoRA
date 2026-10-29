@@ -1,3 +1,0 @@
-nohup: ignoring input
-scripts/motivation/run.sh: line 67: rg: command not found
-[RESTART] Preserved incomplete predictions in logs/motivation-llama3-amazon-yahoo-r64a128-seed2026/svd_low/seq_lora/r0/amazon/partial-20261016-081034
