@@ -3,10 +3,6 @@ LLMs/
 checkpoints/
 logs/
 logs*/
-logs*.out
-*.log
-/train_log.txt
-/eval_resume_log*.txt
 
 __pycache__/
 *.py[cod]

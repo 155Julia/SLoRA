@@ -11,6 +11,8 @@ CONV_MODE="$7"
 DENOISED_MODE="$8"
 TEST_ORDER="$9"
 PYTHON_BIN=${PYTHON_BIN:-python}
+MAX_INPUT_TOKENS=${MAX_INPUT_TOKENS:-0}
+TRUNCATION_SIDE=${TRUNCATION_SIDE:-left}
 
 DATA_PATH="${TASK_PATH}/${DATASET}"
 MODEL_PATH="${MODEL_PATH}/${CKPT}"
@@ -25,6 +27,8 @@ echo "[INFO] Model base=${MODEL_BASE}"
 echo "[INFO] Model path=${MODEL_PATH}"
 echo "[INFO] Dataset=${DATASET}"
 echo "[INFO] CONV_MODE=${CONV_MODE}, DENOISED_MODE=${DENOISED_MODE}, TEST_ORDER=${TEST_ORDER}"
+echo "[INFO] MAX_INPUT_TOKENS=${MAX_INPUT_TOKENS} (0 means no truncation)"
+echo "[INFO] TRUNCATION_SIDE=${TRUNCATION_SIDE}"
 echo "[INFO] Logs -> ${OUT_DIR}"
 
 echo "[RUN] Inference ${DATASET}"
@@ -38,6 +42,8 @@ echo "[RUN] Inference ${DATASET}"
     --denoised_mode "${DENOISED_MODE}" \
     --test_order "${TEST_ORDER}" \
     --batch_size 1 \
+    --max_input_tokens "${MAX_INPUT_TOKENS}" \
+    --truncation_side "${TRUNCATION_SIDE}" \
     --resume \
     >> "${OUT_DIR}/infer.log" 2>&1
 

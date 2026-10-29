@@ -105,9 +105,14 @@ def eval_model(args):
 
     print("Load LoRA")
     tokenizer, model, _, tokenizer_with_prefix_space = load_continual_pretrained_model(model_path, args.model_base, model_name, args.denoised_mode, use_logit_bias=args.use_logit_bias, test_order=args.test_order, denoised_num=args.denoised_num)
+    print(f"Inference model dtype: {next(model.parameters()).dtype}", flush=True)
 
     tokenizer.padding_side = "left"
     tokenizer_with_prefix_space.padding_side = "left"
+    if args.max_input_tokens > 0:
+        tokenizer.truncation_side = args.truncation_side
+        kept_part = "end" if args.truncation_side == "left" else "beginning"
+        print(f"Maximum input length: {args.max_input_tokens} tokens (keep the {kept_part} of each prompt)", flush=True)
 
     # load args.question_file, which is a csv file
     if args.question_file.endswith(".csv"):
@@ -154,9 +159,13 @@ def eval_model(args):
             break
         
         # print("[FIRST INPUT]: ", prompt)
-        input_ids = tokenizer(prompts, return_tensors='pt', padding=True).input_ids
-        input_ids = input_ids.to(device='cuda', non_blocking=True)
-        attention_mask = input_ids.ne(tokenizer.pad_token_id).to(device='cuda', non_blocking=True)
+        tokenized = tokenizer(
+            prompts, return_tensors='pt', padding=True,
+            truncation=args.max_input_tokens > 0,
+            max_length=args.max_input_tokens if args.max_input_tokens > 0 else None,
+        )
+        input_ids = tokenized.input_ids.to(device='cuda', non_blocking=True)
+        attention_mask = tokenized.attention_mask.to(device='cuda', non_blocking=True)
         if args.conv_mode == 'llama3':
             terminators = [
                 tokenizer.eos_token_id,
@@ -207,6 +216,10 @@ if __name__ == "__main__":
     parser.add_argument("--conv-mode", type=str, default="qwen")
     parser.add_argument("--temperature", type=float, default=0.0)
     parser.add_argument("--max_new_tokens", type=int, default=1024)
+    parser.add_argument("--max_input_tokens", type=int, default=0,
+                        help="Limit prompt length; 0 preserves the original untruncated evaluation")
+    parser.add_argument("--truncation_side", choices=["left", "right"], default="left",
+                        help="left keeps the end of a long prompt; right keeps its beginning")
     parser.add_argument("--top_p", type=float, default=1.0)
     parser.add_argument("--num_beams", type=int, default=1)
     parser.add_argument("--batch_size", type=int, default=1)

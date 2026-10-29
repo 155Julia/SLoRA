@@ -3,7 +3,7 @@ set -e
 
 TASK_PATH=${TASK_PATH:-data/TRACE-Benchmark/LLM-CL-Benchmark_5000}
 MODEL_PATH=checkpoints
-LOGS_BASE_PATH=logs
+LOGS_BASE_PATH=${LOGS_BASE_PATH:-logs}
 
 
 # your config
